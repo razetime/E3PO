@@ -1,0 +1,12 @@
+2024-03-31 13:23:39,601 INFO: [preprocessing data] start
+2024-03-31 13:23:39,601 INFO: [create data] OnDemandData is created
+2024-03-31 13:23:39,601 INFO: [generating chunk] start
+2024-03-31 13:23:39,601 INFO: [generating chunk] chunk_idx=0
+2024-03-31 13:23:45,686 INFO: [generating chunk] end
+Traceback (most recent call last):
+  File "/home/raghu/e3po/./e3po/make_preprocessing.py", line 28, in <module>
+    data.make_preprocessing()
+  File "/home/raghu/e3po/e3po/data/on_demand_data.py", line 83, in make_preprocessing
+    user_video_spec, user_data = approach.preprocess_video(source_video_uri, self.dst_video_folder, chunk_info, user_data, self.video_info)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'e3po.approaches.freedom.freedom_approach' has no attribute 'preprocess_video'
