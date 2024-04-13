@@ -326,33 +326,38 @@ def lstm_predict_motion_tile(motion_history, motion_history_size, motion_predict
     user_data
         The user data modified to have the latest fitted model.
     """
-
+    pred = {'yaw': 0, 'pitch': 0, 'roll': 0}
+    if len(motion_history) < 30:
+        return predict_motion_tile(motion_history,motion_history_size,motion_prediction_size), user_data
     # Process data into 2D array
-    data = np.empty((0,3),type=np.float32)
-    for pt in motion_history[:-2]:
+    # print("mhs",motion_history_size)
+    # print("hs", len(motion_history))
+    data = np.empty((0,3),dtype=np.float32)
+    for pt in motion_history:
+        pt = pt['motion_record']
         data = np.vstack([data, np.array([pt["yaw"], pt["pitch"], pt["scale"]])])
+    # print("datashape", data.shape)
     
-    print(data[:3])
-    n_steps_in, n_steps_out = 3, 2
-    X, y = split_sequences(data, 3, 1)
+    n_steps = 3
+    X, y = split_sequences(data, n_steps)
     # the dataset knows the number of features, e.g. 2
+    # print("xshape", X.shape)
     n_features = X.shape[2]
     
-    if user_data['lstm_model'] is None:
+    if 'lstm_model' not in user_data:
         # define model
         model = Sequential()
-        model.add(LSTM(200, activation='relu', input_shape=(n_steps_in, n_features)))
-        model.add(RepeatVector(n_steps_out))
-        model.add(LSTM(200, activation='relu', return_sequences=True))
-        model.add(TimeDistributed(Dense(n_features)))
+        model.add(LSTM(100, activation='relu', return_sequences=True, input_shape=(n_steps, n_features)))
+        model.add(LSTM(100, activation='relu'))
+        model.add(Dense(n_features))
         model.compile(optimizer='adam', loss='mse')
         # fit model
-        model.fit(X, y, epochs=300, verbose=0)
+        model.fit(X, y, epochs=400, verbose=0)
         user_data['lstm_model'] = model
     
     l_model = user_data['lstm_model']
     x_input = data[-3:,:]
-    x_input = x_input.reshape((1, n_steps_in, n_features))
+    x_input = x_input.reshape((1, n_steps, n_features))
     ya,pi,ro = l_model.predict(x_input, verbose=0)[0,:]
     pred = {'yaw': ya, 'pitch': pi, 'scale': ro}
     predicted_record = []
