@@ -327,7 +327,8 @@ def lstm_predict_motion_tile(motion_history, motion_history_size, motion_predict
         The user data modified to have the latest fitted model.
     """
     pred = {'yaw': 0, 'pitch': 0, 'roll': 0}
-    if len(motion_history) < 30:
+    ml = len(motion_history)
+    if ml < 30:
         return predict_motion_tile(motion_history,motion_history_size,motion_prediction_size), user_data
     # Process data into 2D array
     # print("mhs",motion_history_size)
@@ -354,7 +355,13 @@ def lstm_predict_motion_tile(motion_history, motion_history_size, motion_predict
         # fit model
         model.fit(X, y, epochs=400, verbose=0)
         user_data['lstm_model'] = model
-    
+        user_data['prev_motion_len'] = ml
+    elif (ml - user_data['prev_motion_len']) > 100:
+        user_data['lstm_model'].fit(X, y, epochs=50, verbose=0)
+        user_data['prev_motion_len'] = ml
+        print(ml)
+    # if ml%100==0:
+    #     print(ml)
     l_model = user_data['lstm_model']
     x_input = data[-3:,:]
     x_input = x_input.reshape((1, n_steps, n_features))
