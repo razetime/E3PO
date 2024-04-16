@@ -4,9 +4,10 @@ import json
 
 plt.figure(figsize=(10, 6))  # Set the figure size
 
+vid = 'v3_s1'
 
-for approach in ["cubemap", "custom_eac", "erp"]:
-    with open(f'./e3po/result/group_1/release_video_1/{approach}/evaluation.json', 'r') as file:
+for approach in [ "erp","erp_lstm"]:
+    with open(f'./e3po/result/group_1/{vid}/{approach}/evaluation.json', 'r') as file:
         data = json.load(file)
 
 
@@ -36,4 +37,4 @@ plt.ylabel('PSNR (dB)')
 plt.grid(True)
 plt.tight_layout()
 plt.legend()
-plt.savefig("plots/release_video_1.png")
+plt.savefig(f"plots/line_{vid}.png")

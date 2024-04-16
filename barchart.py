@@ -13,8 +13,8 @@ def get_S(b,s,c,mse):
     # S = 1/((alpha*MSE)+(beta*((w1*Cb)+(w2*Cs)+(w3*Cc))) 
     return 1.0/((gc_alpha*mse)+gc_beta*(gc_w1*b+gc_w2*s+gc_w3*c))
 
-videos = ['release_video_1']
-approaches = {"cubemap": [], "erp": [], "custom_eac": []}
+videos = ['v1_s1', 'v1_s2', 'v3_s1']
+approaches = {"erp": [], "erp_lstm": []}
 
 x = np.arange(len(videos))  # the label locations
 width = 0.25
@@ -26,7 +26,7 @@ for video in videos:
     for approach, vals in approaches.items():
         with open(f'./e3po/result/group_1/{video}/{approach}/evaluation.json', 'r') as file:
             data = json.load(file)[-1]
-        vals.append(get_S(*json.loads(data["Cost"]),float(data["AVG MSE"])))
+        vals.append(float(data["GC Score"]))
 
 multiplier = 0
 for approach, measurement in approaches.items():
@@ -56,4 +56,4 @@ ax.legend(loc='upper left', ncols=3)
 # Show the plot with enhancements
 plt.tight_layout()  # Adjust subplot parameters to give specified padding
 
-plt.savefig("plots/bar.png")
+plt.savefig("plots/ppt_lstm_1.png")
