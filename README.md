@@ -1,128 +1,77 @@
-# Introduction
-E3PO is an **O**pen **P**latform for **3**60° video streaming simulation and **E**valuation. E3PO is designed to support the simulation of a variety of 360° video streaming approaches that have been proposed so far, including projection based, tile based, or transcoding based. Particularly, E3PO allows users to convert 360° video into standard or customized projections, segment video into equal or adaptive sizes, implement customized motion prediction algorithms, apply different streaming strategies, and evaluate using any user-specific metrics. Most importantly, E3PO generates the actual visual sequences that will display on the user screen for each simulation. 
+MMSys'24 Grand Challenge Project, done as part of the Multimedia Networking and Systems Course (Spring'24) at NTHU.
 
-Therefore, E3PO provides a perfect solution to objectively compare the performance of different 360° video streaming approaches, using the same video content and same motion trace.
-
-
-
-# Framework
-The framework of E3PO is illustrated as the following figure, which consists of three principal modules, i.e., the ***video pre-processor***, the ***streaming simulator*** and the ***system evaluator***.
-
-To simulate a streaming approach, the ***video pre-processor*** first segments the 360° panoramic video into small video tile chunks according to users’ specific projection and tiling parameters. Then the ***streaming simulator*** reads the provided head motion trace, and simulates the detailed streaming actions which include when and which video chunk is transmitted. Last, the ***system evaluator*** synthesizes the video sequence that is displayed on the user screen and calculates various metrics.
-
-![](/docs/Framework.jpg "e3po_framework")
-
-
-
-# Quick Start
-
-## Code & Dataset
-1. Download E3PO code
+# Running Steps
 ```
-git clone https://github.com/bytedance/E3PO.git
+python ./e3po/make_preprocessing.py -approach_name erp_lstm_dec -approach_type on_demand
+python ./e3po/make_decision.py -approach_name erp_lstm_dec -approach_type on_demand
+python ./e3po/make_evaluation.py -approach_name erp_lstm_dec -approach_type on_demand
 ```
+Also relevant approach: `erp_lstm`
 
-2. Video Source<br>
-Prepare a 360° video (which is not included in E3PO repo), rename and place it at /e3po/source/video/[sample].mp4. Note that the file name and video attributions should match the configurations listed in e3po/e3po.yml.  We have provided a sample video for particpants of 2024 MMSys Grand Challenge.
+# Preliminary Research
+The initial ideas for the project were to tweak some values in the code to see if an improvement in GC score could be observed.
+The exponential smoothing approach of the original method used a coefficient of 0.3. Increases or decreases in the coefficient either worsened the final scores of all methods, or produced a negligible difference.
 
+On the tiling side, we had attempted to increase the number of tiles in the default ERP approach. This resulted in a small decrease in overall GC score.
+Some other approaches were looked at, mostly for inspiration, as what was feasible to implement was much simpler.
+## Preprocessing
+Tiling methods and projections were to be investigated on this side of the project. We explored sources from earlier MMSys symposiums as a starting point[1].
+An FoV-based caching strategy was showing in [4], which took into account network latency and similar concerns. We we unsure of how to correctly use the ideas in E3PO.
+## Tile Decision
+Rondon et al.[2] made a cumulative study on several researched methodologies that were used for head motion prediction. Among these approaches a large number of methods made use of an LSTM model, the idea which made it to our final draft. An extension to an LSTM based approach was also explored in [3] and [5], but was not implemented.
+For tile prediction, a Deep Learning based method can be found in [6], but was left ignored as it used an amount of resources that made it infeasible to implement and test on our hardware.
 
-3. Motion Trace<br>
-Prepare a motion trace file and place it at /e3po/source/motion_trace/[motion_trace].log. Note that E3PO has provided a sample file. If you want to use a different one, you can generate one similarly to that from [360VidStr](https://github.com/360VidStr/A-large-dataset-of-360-video-user-behaviour/blob/main/AggregatedDataset/7.txt).
+# Proposed System 
 
+![e3po system architecture, modified](docs/image2.png)
+<i>Updated Proposed System Architecture</i>
 
-## Execute commands
-To simulate the streaming process, three terminal commands need to be executed sequentially. For example, with the sample simulation E1 we have provided in the project, the following commands should be executed. Note that the approach name as well as the approach type (on_demand or transcoding) should be specified.
+## Motion Prediction LSTM
+The given code uses a simple LSTM model with a window size of 3 to predict future motions. It also uses special smoothing code in order to make sure the tile decision does not overshoot the intended tiles to be downloaded.
+It was described during the project presentation that the model could simply overfit the dataset to perfectly mirror the head movement. However, this method is not done with that guarantee as it receives points on-the-fly, and hence attempts to perform an inexact, general fit that may work for a larger range of motion data.
 
-1. Run the [make_preprocessing.py](e3po/make_preprocessing.py) script (***video pre-processor*** module)
-```
-python ./e3po/make_preprocessing.py -approach_name erp -approach_type on_demand
-```
-Corresponding results can be found at
-```
-|---e3po
-    |---source
-        |---video
-            |---[group_*]
-                |---[video_*]
-                    |---[erp]
-                        |---video_size.json
-                        |---dst_video_folder
-                            |---chunk_***_tile_***.mp4
-    |---log
-        |---[group_*]
-            |---[video_*]
-                |---erp_make_preprocessing.log
-```
+## Motion Intensity Based Tile Decision
+This function is responsible for making decisions regarding which tiles to transmit based on enhanced prediction accuracy and adaptive sampling. The calculation of motion intensity using the square root of the sum of squares of yaw and pitch predictions is based on vector magnitude. In the context of 360° video streaming, the motion of the camera or viewpoint is often represented in terms of yaw and pitch angles. Yaw typically represents horizontal rotation, while pitch represents vertical rotation. These angles indicate the direction in which the camera is pointing or moving. To calculate the overall motion intensity, the yaw and pitch predictions are treated as components of a 2D vector. By taking the square of each component, summing them, and then taking the square root of the result, we obtain the magnitude of this vector. Mathematically, if denote the yaw prediction as y and the pitch prediction as p, then the motion intensity M is calculated as: 
 
-2. Run the [make_decision.py](./e3po/make_decision.py) script (***streaming simulator*** module)
-```
-python ./e3po/make_decision.py -approach_name erp -approach_type on_demand
-```
-Corresponding results can be found at
-```
-|---e3po
-    |---result
-        |---[group_*]
-            |---[video_*]
-                |---[erp]
-                    |---decision.json
-    |---log
-        |---[group_*]
-            |---[video_*]
-                |---erp_make_decision.log
-```
+$$ M = sqrt(y^2 + p^2) $$
 
-3. Run the [make_evaluation.py](./e3po/make_evaluation.py) script (***system evaluator*** module)
-```
-python ./e3po/make_evaluation.py -approach_name erp -approach_type on_demand
-```
+And then calculates an adaptive sampling size based on the intensity of motion. First, calculates an intensity factor by dividing motion_intensity by 10 and then clipping the result between 0.5 and 2, where a value greater than 1 indicates higher motion intensity necessitating finer sampling to capture more details, and a value less than 1 means the motion is less intense, allowing for coarser sampling. After that it got the adaptive sampling size by scaling each dimension of the base sampling size by the intensity factor.
 
-Corresponding results can be found at 
-```
-|---e3po
-    |---result
-        |---[group_*]
-            |---[video_*]
-                |---[erp]
-                    |---evaluation.json
-                    |---output_frames
-                        |---xxx.png
-                        |---output.mp4
-    |---log
-        |---[group_*]
-            |---[video_*]
-                |---erp_make_evaluation.log
-```
+# Experimental Results
+The experiments were done upon three different videos from the given test cases, as in the initial assignment (v1_s1, v2_s1, v3_s1 and their respective motion traces).
 
-## Examples
-We have implemented eight simple but typical approaches, with their detailed descriptions shown in the following table.
+Figure 1 is to show the GC Scores for original erp method and final method (lstm and updated tile decision). The picture depicts that GC Scores is better in two out of three videos. 
 
-|  Name             | Projection | Background Stream |  Tiling | Resolution |
-|  ----             | ----       | ----              | ----    | ----       |
-|  E1               | ERP        | w/o               | 6x6     | -          |
-|  C1               | CMP        | w/o               | 6x6     | -          |
-|  C2               | CMP        | w/                | 6x6     | -          |
-|  C3               | CMP        | w/                | 6x12    | -          |
-|  A1               | EAC        | w/                | 6x12    | -          |
-|  F1 (Freedom)     | ERP        | w/o               | 1x1     | 1680x1120  |
-|  F2 (Freedom)     | ERP        | w/o               | 1x1     | 2400x2176  |
-|  Full             | ERP        | w/o               | 1x1     | -          |
+![](docs/image1.png)
 
+*Fig 1. Comparison of GC Scores for 3 Methods: ERP Vs ERP with Updated Tile Decision (ERP1) Vs ERP with LSTM and Updated Tile Decision (ERP_LSTM)*
 
-The visual comparison results of these eight approaches are illustrated as the following figure.
+![](docs/image4.png)
 
-![](/docs/comparison.jpg "comparison_results")
+*Fig 2. Comparison of Max Bandwidth usage by 3 Methods: ERP Vs ERP with Updated Tile Decision (ERP1) Vs ERP with LSTM and Updated Tile Decision (ERP_LSTM)*
 
+In figure 2, there is a comparison of max bandwidth usage between three methods of original erp, erp with updated tile decision methods and erp with lstm and  updated tile decision. We can see that there is not much difference between the first and second method. But with the lstm method, it reduced the bandwidth usage compared to two other methods. 
 
-For more details, please refer to [Tutorial.md](./docs/Tutorial.md).
+![](docs/image3.png)
 
+*Fig 3. Comparison of MSE Values for 3 Methods: ERP Vs ERP with Updated Tile Decision (ERP1) Vs ERP with LSTM and Updated Tile Decision (ERP_LSTM)*
 
-# Contributes
-We welcome researchers to simulate their own streaming systems using E3PO and submit their implementation back to this project, so that the community can better compare the performance of different solutions. Users making contributions to E3PO shall meet the following two requirements:
+Figure 3 mentions the line plot of MSE values between three methods. In that figure, erp with lstm with updated tile decision outperforms the other two methods. 
 
-- The submitted code should be reviewed by the E3PO group.
-- The submitted code should follow the [GPL 2.0 License](./COPYING) adopted by E3PO.
+![](docs/image5.png)
 
+*Fig 4. Comparison of PSNR Values for 3 Methods: ERP Vs ERP with Updated Tile Decision (ERP1) Vs ERP with LSTM and Updated Tile Decision (ERP_LSTM)*
 
-# License
-[GPL 2.0 License](./COPYING)
+In figure 4, the PSNR value with lstm method is better in video 1 and 3 higher than video 2, in which erp1 (only with updated tile decision) is better.  
+Conclusion
+The current approach performs on the shown test cases but requires more fine tuning on bespoke videos and motion captures.
+Many basic portions of E3PO can be explored: customised tiling logic, and overall assembly method. We have not pushed the limits of how much bandwidth we can abuse to avoid data loss.
+More experimentation can be done to find optimal window size, better projection methods to avoid data loss.
+
+# References
+Fernández-Dasí, Miguel, Mario Montagud, and Josep Paradells Aspas. “Design, Development and Evaluation of Adaptative and Interactive Solutions for High-Quality Viewport-Aware VR360 Video Processing and Delivery: Research Proposal.” In Proceedings of the 13th ACM Multimedia Systems Conference, 367–71. MMSys ’22. New York, NY, USA: Association for Computing Machinery, 2022. https://doi.org/10.1145/3524273.3533929.
+Rondón, Miguel Fabián Romero, Lucile Sassatelli, Ramón Aparicio-Pardo, and Frédéric Precioso. “A Unified Evaluation Framework for Head Motion Prediction Methods in 360° Videos.” In Proceedings of the 11th ACM Multimedia Systems Conference, 279–84. Istanbul Turkey: ACM, 2020. https://doi.org/10.1145/3339825.3394934.
+“Sensors | Free Full-Text | Prediction of Head Movement in 360-Degree Videos Using Attention Model.” Accessed April 17, 2024. https://www.mdpi.com/1424-8220/21/11/3678.
+Sun, Liyang, Yixiang Mao, Tongyu Zong, Yong Liu, and Yao Wang. “Flocking-Based Live Streaming of 360-Degree Video.” In Proceedings of the 11th ACM Multimedia Systems Conference, 26–37. MMSys ’20. New York, NY, USA: Association for Computing Machinery, 2020. https://doi.org/10.1145/3339825.3391856.
+Xu, Yanyu, Yanbing Dong, Junru Wu, Zhengzhong Sun, Zhiru Shi, Jingyi Yu, and Shenghua Gao. “Gaze Prediction in Dynamic 360° Immersive Videos.” In 2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition, 5333–42. Salt Lake City, UT, USA: IEEE, 2018. https://doi.org/10.1109/CVPR.2018.00559.
+Yaqoob, Abid, and Gabriel-Miro Muntean. “Advanced Predictive Tile Selection Using Dynamic Tiling for Prioritized 360° Video VR Streaming.” ACM Transactions on Multimedia Computing, Communications, and Applications 20, no. 1 (August 24, 2023): 6:1-6:28. https://doi.org/10.1145/3603146.
